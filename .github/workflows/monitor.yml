@@ -1,0 +1,44 @@
+name: ferry-monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'        # watchdog/heartbeat: keeps exactly one loop alive
+
+concurrency:
+  group: ferry-monitor
+  cancel-in-progress: false      # singleton: at most 1 running + 1 queued successor
+
+permissions:
+  contents: read                 # checkout needs this (a permissions block zeroes the rest)
+  actions: write                 # self-dispatch successor + disable after deadline
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350         # backstop under GitHub's hard 360-min job cap
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Poll
+        id: poll
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # --- Optional email backup: add these secrets to enable ---
+          # SMTP_USER: ${{ secrets.SMTP_USER }}
+          # SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          # MAIL_TO:   ${{ secrets.MAIL_TO }}
+        run: python3 monitor.py
+
+      - name: Re-trigger successor or stop at deadline
+        if: always()             # runs even if Poll crashed, so the chain self-heals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ steps.poll.outputs.deadline_reached }}" = "true" ]; then
+            echo "Deadline reached — disabling workflow so cron stops."
+            gh workflow disable monitor.yml -R "$GITHUB_REPOSITORY" || true
+          else
+            echo "Re-triggering successor for a fast (~30s) handoff."
+            gh workflow run monitor.yml -R "$GITHUB_REPOSITORY" || true
+          fi
