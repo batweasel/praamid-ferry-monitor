@@ -33,6 +33,7 @@ POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "10"))
 MAX_RUNTIME_SECONDS = int(os.environ.get("MAX_RUNTIME_SECONDS", "20400"))  # 5h40m < 6h job cap
 STOP_AT = os.environ.get("STOP_AT", "2026-06-19T22:30:00+03:00")          # hard deadline
 RE_ALERT_COOLDOWN = int(os.environ.get("RE_ALERT_COOLDOWN", "300"))       # re-ping every 5 min while open
+HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "3600"))  # "still healthy" ping (0 = off)
 
 NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
@@ -185,6 +186,7 @@ def main():
     log(f"ntfy={'set' if NTFY_TOPIC else 'NOT SET'} email={'on' if EMAIL_ENABLED else 'off'}")
 
     start = time.monotonic()
+    last_heartbeat = start  # for the periodic "still healthy" liveness ping
     alerted = {}            # uid -> last alert time (monotonic)
     consec_fail = 0
     degraded = False
@@ -241,6 +243,23 @@ def main():
                 log("OPEN: " + ", ".join(f"{s['time']} {s['ship']}={s['sv']}" for s in open_sailings))
             else:
                 log("no afternoon car spots open")
+
+            # Periodic liveness ping so silence is never mistaken for "monitor died".
+            if HEARTBEAT_INTERVAL_SECONDS > 0 and (now_mono - last_heartbeat) >= HEARTBEAT_INTERVAL_SECONDS:
+                total_aft = sum(
+                    1 for it in data.get("items", []) if (_safe_hour(it) or -1) >= AFTERNOON_FROM_HOUR
+                )
+                detail = (
+                    "OPEN " + ", ".join(f"{s['time']} {s['ship']}={s['sv']}" for s in open_sailings)
+                    if open_sailings else "no spots open yet"
+                )
+                ntfy(
+                    "Ferry monitor healthy",
+                    f"Still running. Watching {total_aft} afternoon sailings; {detail}.",
+                    priority="low", tags="green_heart",
+                )
+                log("heartbeat sent")
+                last_heartbeat = now_mono
 
         except urllib.error.HTTPError as e:
             consec_fail += 1

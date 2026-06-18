@@ -54,6 +54,7 @@ NTFY_TOPIC=<your-topic> AFTERNOON_FROM_HOUR=0 MIN_LEAD_MINUTES=0 \
 | `POLL_INTERVAL` | `10` | Seconds between polls |
 | `STOP_AT` | `2026-06-19T22:30:00+03:00` | Hard stop; workflow disables itself after this |
 | `RE_ALERT_COOLDOWN` | `300` | Re-ping interval while a sailing stays open |
+| `HEARTBEAT_INTERVAL_SECONDS` | `3600` | Hourly low-priority "still healthy" ping (0 disables) |
 
 ## Stop / cleanup
 
