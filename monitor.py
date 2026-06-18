@@ -25,7 +25,7 @@ URL = os.environ.get(
     "URL",
     "https://www.praamid.ee/online/events?direction=VK&departure-date=2026-06-19",
 )
-BOOK_URL = os.environ.get("BOOK_URL", URL)            # tapping the push opens this
+BOOK_URL = os.environ.get("BOOK_URL", "https://www.praamid.ee/")  # tap opens the booking site, not the JSON API
 CAP_FIELD = os.environ.get("CAP_FIELD", "sv")          # capacities.sv = car spots
 AFTERNOON_FROM_HOUR = int(os.environ.get("AFTERNOON_FROM_HOUR", "12"))
 MIN_LEAD_MINUTES = int(os.environ.get("MIN_LEAD_MINUTES", "30"))  # ignore sailings too soon to reach
